@@ -119,18 +119,9 @@ void QUINTIC_PLANNER::takeoff_exec( float altitude ){
     pos_end_to << pos_init(0), pos_init(1), altitude;
     quat_end_to = quat_init;
     
-    //Arming command
-    // if ( !_arm_status ) {
-    //     vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
-    //     RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
-    // }
-    // std::cout<<"Arm state: "<<_arm_status<<"\n";
-    // while( !_arm_status ) {
-    //     // RCLCPP_INFO(this->get_logger(), "Waiting for vehicle to arm...");
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    // }
-    // if( _arm_status)
-    // RCLCPP_INFO(this->get_logger(), "Vehicle armed!");
+    if( !_arm_status ) {
+        arm();
+    }
 
     //Takeoff trajectory
     generateTakeOffTraj( pos_init, pos_end_to, _cv_to );
