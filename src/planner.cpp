@@ -37,65 +37,176 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     _vehicle_command_pub =
         this->create_publisher<px4_msgs::msg::VehicleCommand>("fmu/in/vehicle_command", 10);
     
-    _path_pub =
+    _offboard_control_mode_pub =
+        this->create_publisher<px4_msgs::msg::OffboardControlMode>("fmu/in/offboard_control_mode", 10);
+    
+        _path_pub =
         this->create_publisher<nav_msgs::msg::Path>("/planner/path", 10);
 
     //Timer callback init
     _timer_loop =
         this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::run_loop, this));
     _timer_publisher =
-        this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_trajectory, this));
-
+        this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_trajectory_setpoint, this));
+    _timer_offboard =
+        this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_offboard_control_mode, this));
+    // _timer_client =
+    //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::client_loop, this));
+    boost::thread client_loop_t( &QUINTIC_PLANNER::client_loop, this );
 }
 
 void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr odom_msg) {
     
     _pos_odom << odom_msg->position[0], odom_msg->position[1], odom_msg->position[2];
     _quat_odom << odom_msg->q[0], odom_msg->q[1], odom_msg->q[2], odom_msg->q[3];
-    if( !_first_odom ) {
-        _pos_cmd = _pos_odom;
-        
-    }
+
     _first_odom = true;
 
 }
 
 void QUINTIC_PLANNER::run_loop() {
     if (!_first_odom) {
-        RCLCPP_WARN(this->get_logger(), "Waiting for odometry data...");
+        // RCLCPP_WARN(this->get_logger(), "Waiting for odometry data...");
         return;
     }
 
-    if ( !_arm_status ) {
-        vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
-        RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
+    if ( !_first_traj ) {
+        _pos_cmd = _pos_odom;
+        _quat_cmd = _quat_odom;
+        _vel_cmd << 0.0f, 0.0f, 0.0f;
+        _acc_cmd << 0.0f, 0.0f, 0.0f;
+        _first_traj = true;
+        
+        return;
     }
+    if (_offboard_setpoint_counter == 10) {
+		this->vehicle_command_publisher(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+	}
+
+    // publish_offboard_control_mode();
+    // publish_trajectory_setpoint();
+    // if ( !_arm_status ) {
+    //     vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
+    //     RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
+    // }
+    // std::cout<<"Arm state: "<<_arm_status<<"\n";
+    // while( !_arm_status ) {
+    //     
+    //     // RCLCPP_INFO(this->get_logger(), "Waiting for vehicle to arm...");
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // }
+    // takeoff_exec(-3.0f );
+
+    if (_offboard_setpoint_counter < 11) {
+		_offboard_setpoint_counter++;
+	}
 
 }
 
-void QUINTIC_PLANNER::takeoff_exec( const float h ){
+void QUINTIC_PLANNER::takeoff_exec( float altitude ){
 
     Eigen::Vector3d pos_init;
     Eigen::Vector4d quat_init;
     Eigen::Vector3d pos_end_to;
     Eigen::Vector4d quat_end_to;
+    // std::vector<double> pos_init, quat_init, pos_end_to, quat_end_to
 
-    if( h > 0.0f )
-        h = -h;
+    if( altitude > 0.0f )
+        altitude = -altitude;
 
     pos_init = _pos_odom;
     quat_init = _quat_odom;
-    pos_end_to << pos_init(0), pos_init(1), h;
+    pos_end_to << pos_init(0), pos_init(1), altitude;
     quat_end_to = quat_init;
     
     //Arming command
-    if ( !_arm_status ) {
-        vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
-        RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
-    }
+    // if ( !_arm_status ) {
+    //     vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
+    //     RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
+    // }
+    // std::cout<<"Arm state: "<<_arm_status<<"\n";
+    // while( !_arm_status ) {
+    //     // RCLCPP_INFO(this->get_logger(), "Waiting for vehicle to arm...");
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // }
+    // if( _arm_status)
+    // RCLCPP_INFO(this->get_logger(), "Vehicle armed!");
 
+    //Takeoff trajectory
+    generateTakeOffTraj( pos_init, pos_end_to, _cv_to );
 
 } 
+
+void QUINTIC_PLANNER::client_loop() {
+    bool exit = false;
+    std::cout << "Starting client loop...\n";
+    while( !exit && rclcpp::ok() ) {
+        std::cout << "Enter command [arm | go | takeoff | stop]: \n"; 
+        std::cin >> _cmd;
+        if( _cmd == "arm" ) {
+            this->arm();
+        }
+        else if( _cmd == "takeoff" ) {
+            std::cout << "Enter takeoff altitude: \n"; 
+            std::cin >> _to_altitude;
+            takeoff_exec( _to_altitude );
+        }
+        else if( _cmd == "stop" ) {
+            exit = true;
+            rclcpp::shutdown();
+        }
+        else {
+            std::cout << "Unknown command;\n";
+        }
+    } 
+
+}
+
+void QUINTIC_PLANNER::publish_trajectory_setpoint() {
+
+    if( _first_odom && _first_traj ) {
+
+        px4_msgs::msg::TrajectorySetpoint msg{};
+        rclcpp::Time now = this->get_clock()->now();
+    
+        msg.timestamp = now.nanoseconds() / 1000.0;
+    
+        msg.position[0] = _pos_cmd(0);
+        msg.position[1] = _pos_cmd(1);
+        msg.position[2] = _pos_cmd(2);
+    
+        msg.velocity[0] = _vel_cmd(0);
+        msg.velocity[1] = _vel_cmd(1);
+        msg.velocity[2] = _vel_cmd(2);
+    
+        msg.acceleration[0] = _acc_cmd(0);
+        msg.acceleration[1] = _acc_cmd(1);
+        msg.acceleration[2] = _acc_cmd(2);
+    
+        matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
+        msg.yaw = matrix::Eulerf( des_att ).psi();
+        msg.yawspeed = 0.0f;
+    
+        _trajectory_setpoint_pub->publish(msg);
+
+    }
+
+}
+
+void QUINTIC_PLANNER::publish_offboard_control_mode() {
+    
+    px4_msgs::msg::OffboardControlMode msg{};
+    rclcpp::Time now = this->get_clock()->now();
+    msg.timestamp = now.nanoseconds() / 1000.0;
+
+    msg.position = true;
+    msg.velocity = true;
+    msg.acceleration = true;
+    msg.attitude = false;
+    msg.body_rate = false;
+
+    _offboard_control_mode_pub->publish(msg);
+}
 
 void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1, float param2 ) {
     
@@ -118,10 +229,16 @@ void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1,
     _vehicle_command_pub->publish(msg);
 }
 
+void QUINTIC_PLANNER::arm() {
+    vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
+    RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
+}
+
 int main(int argc, char* argv[]) {
 	std::cout << "Starting Quintic Polynomial Trajectory node..." << std::endl;
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 	rclcpp::init(argc, argv);
+
     rclcpp::spin( std::make_shared<QUINTIC_PLANNER>() );
 
     rclcpp::shutdown();

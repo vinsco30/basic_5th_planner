@@ -28,7 +28,7 @@ include_directories(include)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(quintic_planner src/planner.cpp)
+add_executable(quintic_planner src/planner.cpp src/5th_polynomial.cpp)
 ament_target_dependencies(quintic_planner rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 std_msgs nav_msgs)
 target_include_directories(quintic_planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>

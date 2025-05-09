@@ -3,6 +3,8 @@
 #include <chrono>
 #include "utils.h"
 #include <string>
+#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 
 //PX4 messages
 #include <px4_msgs/msg/vehicle_odometry.hpp>
@@ -18,28 +20,32 @@
 #include <std_msgs/msg/bool.hpp>
 
 //Matrix lib
-#include "matrix/Matrix.hpp"
-#include "matrix/Quaternion.hpp"
-#include "matrix/Euler.hpp"
-
-//5th order polynomial trajectory planner library
-#include "5th_polynomial.hpp"
+#include "../include/matrix/Matrix.hpp"
+#include "../include/matrix/Quaternion.hpp"
+#include "../include/matrix/Euler.hpp"
 
 class QUINTIC_PLANNER : public rclcpp::Node
 {
 public:
     QUINTIC_PLANNER();
+
+    void arm();
     
 private:
     //Callback functions
     void odom_cb( const px4_msgs::msg::VehicleOdometry::SharedPtr );
 
     void run_loop();
-    void takeoff_exec( const float altitude );
+    void client_loop();
+    void takeoff_exec( float altitude );
     void land_exec();
     void goto_exec();
     void vehicle_command_publisher( uint16_t command, float param1 = 0.0f, float param2 = 0.0f );
     void publish_trajectory_setpoint();
+    void publish_offboard_control_mode();
+
+    /*Trajectory generation functions*/
+    void generateTakeOffTraj( const Eigen::Vector3d& start_pos, const Eigen::Vector3d& final_pos, const float cv );
 
     //Subscriptions
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
@@ -69,12 +75,19 @@ private:
     Eigen::Vector3d _pos_cmd;
     Eigen::Vector3d _vel_cmd;
     Eigen::Vector3d _acc_cmd;
+    Eigen::Vector4d _quat_cmd;
     float _yaw_cmd{0.0f};
     float _yaw_rate_cmd{0.0f};
+
+    int _offboard_setpoint_counter{0};
+    std::string _cmd;
 
 
     //Flags
     bool _first_odom{false};
+    bool _first_traj{false};
+    bool _trajectory_execution{false};
+    bool _stop_trajectory{false};
 
     //Parameters
     float _cv{0.0f}; ///< cruise velocity
@@ -84,5 +97,7 @@ private:
 
     rclcpp::TimerBase::SharedPtr _timer_loop;
     rclcpp::TimerBase::SharedPtr _timer_publisher;
+    rclcpp::TimerBase::SharedPtr _timer_offboard;
+    rclcpp::TimerBase::SharedPtr _timer_client;
 
 };

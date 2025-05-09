@@ -1,4 +1,4 @@
-
+#include "planner.hpp"
 using namespace std;
 
 //--------------------------5 order--------------------------------------------
@@ -80,3 +80,62 @@ void computeQuinticTraj(Eigen::MatrixXd A, double t0, double tf, int n, std::vec
         time.push_back(t);
     }    
 }
+
+void QUINTIC_PLANNER::generateTakeOffTraj( const Eigen::Vector3d& start_pos, const Eigen::Vector3d& final_pos, const float cv ) {
+
+    std::vector<double> vec_s0{0.0, 0.0, 0.0};
+    
+    double tf = ( final_pos-start_pos ).norm() / cv;
+    double dt = 0.01;
+    double t0 = 0.0;
+    double n_points = tf * 1/dt;
+    int np = ceil( n_points );
+    std::vector<double> vec_sf{( final_pos-start_pos ).norm(), 0.0, 0.0};
+
+    Eigen::MatrixXd traj_A = computeQuinticCoeff( t0, tf,  vec_s0, vec_sf );  
+    std::vector<double> s, d_s, dd_s, time_s;
+
+    computeQuinticTraj( traj_A, t0, tf, np, s, d_s, dd_s, time_s );
+    std::vector<double> xd, yd, zd, d_xd, d_yd, d_zd, dd_xd, dd_yd, dd_zd;
+
+    for( int i=0; i<s.size(); i++ ) {
+        xd.push_back(start_pos(0) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(0)-start_pos(0) ));
+        yd.push_back(start_pos(1) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(1)-start_pos(1) ));
+        zd.push_back(start_pos(2) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(2)-start_pos(2) ));
+        d_xd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(0)-start_pos(0) ));
+        d_yd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(1)-start_pos(1) ));
+        d_zd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(2)-start_pos(2) ));
+        dd_xd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(0)-start_pos(0) ));
+        dd_yd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(1)-start_pos(1) ));
+        dd_zd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(2)-start_pos(2) ));
+    }
+    int j = 0;
+    _trajectory_execution = false;
+    while( j<xd.size() && !_stop_trajectory ) {
+        _pos_cmd(0) = xd[j];
+        _pos_cmd(1) = yd[j];
+        _pos_cmd(2) = zd[j];
+        _vel_cmd(0) = d_xd[j];
+        _vel_cmd(1) = d_yd[j];
+        _vel_cmd(2) = d_zd[j];
+        _acc_cmd(0) = dd_xd[j];
+        _acc_cmd(1) = dd_yd[j];
+        _acc_cmd(2) = dd_zd[j];
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        j++;
+        _trajectory_execution = true;
+    }
+    _trajectory_execution = false;
+    _stop_trajectory = false;  
+
+        }
