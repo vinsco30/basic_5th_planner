@@ -46,10 +46,10 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     //Timer callback init
     _timer_loop =
         this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::run_loop, this));
-    _timer_publisher =
-        this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_trajectory_setpoint, this));
-    _timer_offboard =
-        this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_offboard_control_mode, this));
+    // _timer_publisher =
+    //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_trajectory_setpoint, this));
+    // _timer_offboard =
+    //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::publish_offboard_control_mode, this));
     // _timer_client =
     //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::client_loop, this));
     boost::thread client_loop_t( &QUINTIC_PLANNER::client_loop, this );
@@ -59,6 +59,8 @@ void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr od
     
     _pos_odom << odom_msg->position[0], odom_msg->position[1], odom_msg->position[2];
     _quat_odom << odom_msg->q[0], odom_msg->q[1], odom_msg->q[2], odom_msg->q[3];
+    matrix::Quaternionf actual_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
+    _yaw_odom = matrix::Eulerf(actual_att).psi();
 
     _first_odom = true;
 
@@ -83,19 +85,8 @@ void QUINTIC_PLANNER::run_loop() {
 		this->vehicle_command_publisher(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
 
-    // publish_offboard_control_mode();
-    // publish_trajectory_setpoint();
-    // if ( !_arm_status ) {
-    //     vehicle_command_publisher( px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1 );
-    //     RCLCPP_INFO(this->get_logger(), "Arming vehicle...");
-    // }
-    // std::cout<<"Arm state: "<<_arm_status<<"\n";
-    // while( !_arm_status ) {
-    //     
-    //     // RCLCPP_INFO(this->get_logger(), "Waiting for vehicle to arm...");
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    // }
-    // takeoff_exec(-3.0f );
+    publish_offboard_control_mode();
+    publish_trajectory_setpoint();
 
     if (_offboard_setpoint_counter < 11) {
 		_offboard_setpoint_counter++;
@@ -105,28 +96,63 @@ void QUINTIC_PLANNER::run_loop() {
 
 void QUINTIC_PLANNER::takeoff_exec( float altitude ){
 
-    Eigen::Vector3d pos_init;
-    Eigen::Vector4d quat_init;
-    Eigen::Vector3d pos_end_to;
-    Eigen::Vector4d quat_end_to;
-    // std::vector<double> pos_init, quat_init, pos_end_to, quat_end_to
+    if(!_takeoff_completed) {
 
-    if( altitude > 0.0f )
-        altitude = -altitude;
-
-    pos_init = _pos_odom;
-    quat_init = _quat_odom;
-    pos_end_to << pos_init(0), pos_init(1), altitude;
-    quat_end_to = quat_init;
+        Eigen::Vector3d pos_init;
+        Eigen::Vector4d quat_init;
+        Eigen::Vector3d pos_end_to;
+        Eigen::Vector4d quat_end_to;
+        // std::vector<double> pos_init, quat_init, pos_end_to, quat_end_to
     
-    if( !_arm_status ) {
-        arm();
+        if( altitude > 0.0f )
+            altitude = -altitude;
+    
+        pos_init = _pos_odom;
+        quat_init = _quat_odom;
+        pos_end_to << pos_init(0), pos_init(1), altitude;
+        quat_end_to = quat_init;
+        
+        if( !_arm_status ) {
+            arm();
+        }
+    
+        //Takeoff trajectory
+        generateTakeOffTraj( pos_init, pos_end_to, _cv_to );
+        _takeoff_completed = true;
+        std::cout << "Takeoff trajectory set\n";
+    }
+    else {
+        std::cout << "Takeoff already completed\n";
     }
 
-    //Takeoff trajectory
-    generateTakeOffTraj( pos_init, pos_end_to, _cv_to );
 
 } 
+
+void QUINTIC_PLANNER::goto_exec() {
+
+    if( _takeoff_completed ) {
+
+        Eigen::Vector3d pos_init;
+        Eigen::Vector4d quat_init;
+        Eigen::Vector3d pos_end;
+        Eigen::Vector4d quat_end;
+
+        pos_init = _pos_odom;
+        quat_init = _quat_odom;
+
+        pos_end << _pos_key(0), _pos_key(1), _pos_key(2);;
+
+        if( pos_end(3) > 0.0f )
+        pos_end(3) = -pos_end(3);
+
+        generateGoToTraj( pos_init, _yaw_odom, pos_end, _yaw_key, _cv );
+        std::cout << "Goto trajectory set\n";
+    }
+    else {
+        std::cout << "Takeoff not completed yet\n";
+    }
+
+}
 
 void QUINTIC_PLANNER::client_loop() {
     bool exit = false;
@@ -141,6 +167,17 @@ void QUINTIC_PLANNER::client_loop() {
             std::cout << "Enter takeoff altitude: \n"; 
             std::cin >> _to_altitude;
             takeoff_exec( _to_altitude );
+        }
+        else if( _cmd == "go" ) {
+            std::cout << "Enter X coordinate: "; 
+            std::cin >> _pos_key(0);
+            std::cout << "Enter Y coordinate: "; 
+            std::cin >> _pos_key(1);
+            std::cout << "Enter Z coordinate: "; 
+            std::cin >> _pos_key(2);
+            std::cout << "Enter final yaw: "; 
+            std::cin >> _yaw_key;
+            goto_exec();
         }
         else if( _cmd == "stop" ) {
             exit = true;

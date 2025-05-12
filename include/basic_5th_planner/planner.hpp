@@ -46,6 +46,7 @@ private:
 
     /*Trajectory generation functions*/
     void generateTakeOffTraj( const Eigen::Vector3d& start_pos, const Eigen::Vector3d& final_pos, const float cv );
+    void generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
 
     //Subscriptions
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
@@ -70,6 +71,7 @@ private:
     bool _arm_status{false};
     Eigen::Vector3d _pos_odom;
     Eigen::Vector4d _quat_odom;
+    float _yaw_odom{0.0f};
 
     //Commanded quantities
     Eigen::Vector3d _pos_cmd;
@@ -81,6 +83,8 @@ private:
 
     int _offboard_setpoint_counter{0};
     std::string _cmd;
+    Eigen::Vector3d _pos_key;
+    float _yaw_key{0.0f};
 
 
     //Flags
@@ -88,6 +92,7 @@ private:
     bool _first_traj{false};
     bool _trajectory_execution{false};
     bool _stop_trajectory{false};
+    bool _takeoff_completed{false};
 
     //Parameters
     float _cv{0.0f}; ///< cruise velocity

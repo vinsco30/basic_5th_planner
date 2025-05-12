@@ -138,4 +138,47 @@ void QUINTIC_PLANNER::generateTakeOffTraj( const Eigen::Vector3d& start_pos, con
     _trajectory_execution = false;
     _stop_trajectory = false;  
 
+}
+
+void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_quat, const Eigen::Vector3d& final_pos, const float & final_yaw, const float cv ) {
+
+    //Yaw heading to the target point trajectory
+    Eigen::Vector2d heading = final_pos.head(2) - start_pos.head(2);
+    heading /= heading.norm();
+    double yaw_first = atan2(heading(1), heading(0));
+    std::cout<<"\n Yaw towards the target point: "<<yaw_first<<" rad\n";
+
+    //Control to avoid high yaw changes
+    if ( yaw_first >= -M_PI && yaw_first <= -M_PI_2 ) {
+        if (yaw_0 >= M_PI_2 && yaw_0 <= M_PI ) {
+            yaw_first += 2*M_PI; 
+            cout<<"\n First case Heading angle now: "<<yaw_first<<endl;
         }
+    }
+    if ( yaw_first >= M_PI_2 && yaw_first <= M_PI ) {
+        if ( yaw_0 >= -M_PI && yaw_0 <= -M_PI_2 ) {
+            yaw_first -= 2*M_PI;
+            cout<<"\n Second case, Heading angle: "<<yaw_first<<endl;
+        }
+    
+    }
+
+    std::vector<double> vec_yaw_0{0.0, 0.0, 0.0};
+    std::vector<double> vec_yaw_f{yaw_first, 0.0, 0.0};
+    
+    // std::vector<double> vec_s0{0.0, 0.0, 0.0};
+
+    
+    // double tf = ( final_pos-start_pos ).norm() / cv;
+    // double dt = 0.01;
+    // double t0 = 0.0;
+    // double n_points = tf * 1/dt;
+    // int np = ceil( n_points );
+    // std::vector<double> vec_sf{( final_pos-start_pos ).norm(), 0.0, 0.0};
+
+    // Eigen::MatrixXd traj_A = computeQuinticCoeff( t0, tf,  vec_s0, vec_sf );  
+    // std::vector<double> s, d_s, dd_s, time_s;
+
+    // computeQuinticTraj( traj_A, t0, tf, np, s, d_s, dd_s, time_s );
+    // std::vector<double> xd, yd, zd, d_xd, d_yd, d_zd, dd_xd, dd_yd, dd_zd;
+}
