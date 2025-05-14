@@ -140,7 +140,7 @@ void QUINTIC_PLANNER::generateTakeOffTraj( const Eigen::Vector3d& start_pos, con
 
 }
 
-void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_quat, const Eigen::Vector3d& final_pos, const float & final_yaw, const float cv ) {
+void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float & final_yaw, const float cv ) {
 
     //Yaw heading to the target point trajectory
     Eigen::Vector2d heading = final_pos.head(2) - start_pos.head(2);
@@ -150,22 +150,43 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
 
     //Control to avoid high yaw changes
     if ( yaw_first >= -M_PI && yaw_first <= -M_PI_2 ) {
-        if (yaw_0 >= M_PI_2 && yaw_0 <= M_PI ) {
+        if (start_yaw >= M_PI_2 && start_yaw <= M_PI ) {
             yaw_first += 2*M_PI; 
             cout<<"\n First case Heading angle now: "<<yaw_first<<endl;
         }
     }
     if ( yaw_first >= M_PI_2 && yaw_first <= M_PI ) {
-        if ( yaw_0 >= -M_PI && yaw_0 <= -M_PI_2 ) {
+        if ( start_yaw >= -M_PI && start_yaw <= -M_PI_2 ) {
             yaw_first -= 2*M_PI;
             cout<<"\n Second case, Heading angle: "<<yaw_first<<endl;
         }
     
     }
 
-    std::vector<double> vec_yaw_0{0.0, 0.0, 0.0};
-    std::vector<double> vec_yaw_f{yaw_first, 0.0, 0.0};
+    std::vector<double> vec_yaw_s0{0.0, 0.0, 0.0};
+    std::vector<double> vec_yaw_sf{yaw_first, 0.0, 0.0};
+
+    double dt = 0.01;
+    double t0 = 0.0;
+    double tf = fabs( yaw_first - start_yaw ) / _cv_rot;
+    double n_points = tf * 1/dt;
+    int np = ceil( n_points );
     
+    Eigen::MatrixXd traj_A_yaw1 = computeQuinticCoeff( t0, tf,  vec_yaw_s0, vec_yaw_sf );
+    std::vector<double> s_yaw, d_s_yaw, dd_s_yaw, time_s_yaw;
+
+    computeQuinticTraj( traj_A_yaw1, t0, tf, np, s_yaw, d_s_yaw, dd_s_yaw, time_s_yaw );
+
+    int j = 0;
+    _trajectory_execution = false;
+    while( j<s_yaw.size() && !_stop_trajectory ) {
+        _yaw_cmd = s_yaw[j];
+        _yaw_rate_cmd = d_s_yaw[j];
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        j++;
+        _trajectory_execution = true;
+    }
+    _trajectory_execution = false;
     // std::vector<double> vec_s0{0.0, 0.0, 0.0};
 
     

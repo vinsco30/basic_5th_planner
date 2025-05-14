@@ -97,6 +97,7 @@ private:
     //Parameters
     float _cv{0.0f}; ///< cruise velocity
     float _cv_to{0.0f}; ///< cruise velocity for takeoff
+    float _cv_rot{0.0f}; ///< cruise velocity for rotation
     float _to_altitude{0.0f}; ///< takeoff altitude
 
 

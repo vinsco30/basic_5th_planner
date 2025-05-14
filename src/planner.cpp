@@ -8,6 +8,8 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
     this->declare_parameter<float>( "takeoff_altitude", 1.5f);
     _to_altitude = this->get_parameter("takeoff_altitude").as_double();
+    this->declare_parameter<float>( "cruise_velocity_rotation", 1.0f );
+    _cv_rot = this->get_parameter("cruise_velocity_rotation").as_double();
 
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
     auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
@@ -59,7 +61,7 @@ void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr od
     
     _pos_odom << odom_msg->position[0], odom_msg->position[1], odom_msg->position[2];
     _quat_odom << odom_msg->q[0], odom_msg->q[1], odom_msg->q[2], odom_msg->q[3];
-    matrix::Quaternionf actual_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
+    matrix::Quaternionf actual_att(_quat_odom(0), _quat_odom(1), _quat_odom(2), _quat_odom(3));
     _yaw_odom = matrix::Eulerf(actual_att).psi();
 
     _first_odom = true;
@@ -77,6 +79,7 @@ void QUINTIC_PLANNER::run_loop() {
         _quat_cmd = _quat_odom;
         _vel_cmd << 0.0f, 0.0f, 0.0f;
         _acc_cmd << 0.0f, 0.0f, 0.0f;
+        _yaw_cmd = _yaw_odom;
         _first_traj = true;
         
         return;
@@ -130,7 +133,7 @@ void QUINTIC_PLANNER::takeoff_exec( float altitude ){
 
 void QUINTIC_PLANNER::goto_exec() {
 
-    if( _takeoff_completed ) {
+    // if( _takeoff_completed ) {
 
         Eigen::Vector3d pos_init;
         Eigen::Vector4d quat_init;
@@ -139,18 +142,21 @@ void QUINTIC_PLANNER::goto_exec() {
 
         pos_init = _pos_odom;
         quat_init = _quat_odom;
+        std::cout<<"step1\n";
+        pos_end << _pos_key(0), _pos_key(1), _pos_key(2);
 
-        pos_end << _pos_key(0), _pos_key(1), _pos_key(2);;
+        if( pos_end(2) > 0.0 ) {
+            std::cout << "Z coordinate is positive, setting it to negative\n";
+            pos_end(2) = -pos_end(2);
+        }
 
-        if( pos_end(3) > 0.0f )
-        pos_end(3) = -pos_end(3);
-
+        std::cout<<"step2\n";
         generateGoToTraj( pos_init, _yaw_odom, pos_end, _yaw_key, _cv );
         std::cout << "Goto trajectory set\n";
-    }
-    else {
-        std::cout << "Takeoff not completed yet\n";
-    }
+    // }
+    // else {
+    //     std::cout << "Takeoff not completed yet\n";
+    // }
 
 }
 
@@ -212,8 +218,10 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
         msg.acceleration[2] = _acc_cmd(2);
     
         matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
-        msg.yaw = matrix::Eulerf( des_att ).psi();
-        msg.yawspeed = 0.0f;
+        // msg.yaw = matrix::Eulerf( des_att ).psi();
+        // msg.yawspeed = 0.0f;
+        msg.yaw = _yaw_cmd;
+        msg.yawspeed = _yaw_rate_cmd;
     
         _trajectory_setpoint_pub->publish(msg);
 
@@ -234,6 +242,7 @@ void QUINTIC_PLANNER::publish_offboard_control_mode() {
     msg.body_rate = false;
 
     _offboard_control_mode_pub->publish(msg);
+    // std::cout<<"Pubblico offboard_control_mode\n";
 }
 
 void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1, float param2 ) {
