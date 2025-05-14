@@ -70,7 +70,7 @@ void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr od
 
 void QUINTIC_PLANNER::run_loop() {
     if (!_first_odom) {
-        // RCLCPP_WARN(this->get_logger(), "Waiting for odometry data...");
+        RCLCPP_WARN(this->get_logger(), "Waiting for odometry data...");
         return;
     }
 

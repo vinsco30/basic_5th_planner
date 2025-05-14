@@ -163,7 +163,7 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
     
     }
 
-    std::vector<double> vec_yaw_s0{0.0, 0.0, 0.0};
+    std::vector<double> vec_yaw_s0{start_yaw, 0.0, 0.0};
     std::vector<double> vec_yaw_sf{yaw_first, 0.0, 0.0};
 
     double dt = 0.01;
@@ -187,19 +187,96 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
         _trajectory_execution = true;
     }
     _trajectory_execution = false;
-    // std::vector<double> vec_s0{0.0, 0.0, 0.0};
 
+    //X-Y-Z trajectory
+    std::vector<double> vec_s0{0.0, 0.0, 0.0};
+    std::vector<double> vec_sf{( final_pos-start_pos ).norm(), 0.0, 0.0};
+
+    tf = ( final_pos-start_pos ).norm() / cv;
+    n_points = tf * 1/dt;
+    np = ceil( n_points );
+
+    Eigen::MatrixXd traj_A = computeQuinticCoeff( t0, tf,  vec_s0, vec_sf );
+    std::vector<double> s, d_s, dd_s, time_s;
+
+    computeQuinticTraj( traj_A, t0, tf, np, s, d_s, dd_s, time_s );
+    std::vector<double> xd, yd, zd, d_xd, d_yd, d_zd, dd_xd, dd_yd, dd_zd;
+
+    for( int i=0; i<s.size(); i++ ) {
+        xd.push_back(start_pos(0) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(0)-start_pos(0) ));
+        yd.push_back(start_pos(1) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(1)-start_pos(1) ));
+        zd.push_back(start_pos(2) + (s[i]/( final_pos-start_pos ).norm())*
+            ( final_pos(2)-start_pos(2) ));
+        d_xd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(0)-start_pos(0) ));
+        d_yd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(1)-start_pos(1) ));
+        d_zd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(2)-start_pos(2) ));
+        dd_xd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(0)-start_pos(0) ));
+        dd_yd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(1)-start_pos(1) ));
+        dd_zd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+            ( final_pos(2)-start_pos(2) ));
+    }
+    j = 0;
+    _trajectory_execution = false;
+    while( j<xd.size() && !_stop_trajectory ) {
+        _pos_cmd(0) = xd[j];
+        _pos_cmd(1) = yd[j];
+        _pos_cmd(2) = zd[j];
+        _vel_cmd(0) = d_xd[j];
+        _vel_cmd(1) = d_yd[j];
+        _vel_cmd(2) = d_zd[j];
+        _acc_cmd(0) = dd_xd[j];
+        _acc_cmd(1) = dd_yd[j];
+        _acc_cmd(2) = dd_zd[j];
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        j++;
+        _trajectory_execution = true;
+    }
+    _trajectory_execution = false;
+
+    //Final Yaw trajectory
+    // double final_heading = final_yaw;
+    // //Control to avoid high yaw changes
+    // if ( final_yaw >= -M_PI && final_yaw <= -M_PI_2 ) {
+    //     if (yaw_first >= M_PI_2 && yaw_first <= M_PI ) {
+    //         final_heading += 2*M_PI; 
+    //         cout<<"\n First case Heading angle now: "<<final_heading<<endl;
+    //     }
+    // }
+    // if ( final_yaw >= M_PI_2 && final_yaw <= M_PI ) {
+    //     if ( yaw_first >= -M_PI && yaw_first <= -M_PI_2 ) {
+    //         final_heading -= 2*M_PI;
+    //         cout<<"\n Second case, Heading angle: "<<final_heading<<endl;
+    //     }
     
-    // double tf = ( final_pos-start_pos ).norm() / cv;
-    // double dt = 0.01;
-    // double t0 = 0.0;
-    // double n_points = tf * 1/dt;
-    // int np = ceil( n_points );
-    // std::vector<double> vec_sf{( final_pos-start_pos ).norm(), 0.0, 0.0};
+    // }
+    // std::vector<double> vec_yaw_s0_2{yaw_first, 0.0, 0.0};
+    // std::vector<double> vec_yaw_sf_2{final_heading, 0.0, 0.0};
+    // tf = fabs( final_heading - yaw_first ) / _cv_rot;
+    // n_points = tf * 1/dt;
+    // np = ceil( n_points );
+    
+    // Eigen::MatrixXd traj_A_yawf = computeQuinticCoeff( t0, tf,  vec_yaw_s0_2, vec_yaw_sf_2 );
+    // std::vector<double> s_yawf, d_s_yawf, dd_s_yawf, time_s_yawf;
 
-    // Eigen::MatrixXd traj_A = computeQuinticCoeff( t0, tf,  vec_s0, vec_sf );  
-    // std::vector<double> s, d_s, dd_s, time_s;
+    // computeQuinticTraj( traj_A_yawf, t0, tf, np, s_yawf, d_s_yawf, dd_s_yawf, time_s_yawf );
 
-    // computeQuinticTraj( traj_A, t0, tf, np, s, d_s, dd_s, time_s );
-    // std::vector<double> xd, yd, zd, d_xd, d_yd, d_zd, dd_xd, dd_yd, dd_zd;
+    // j = 0;
+    // _trajectory_execution = false;
+    // while( j<s_yawf.size() && !_stop_trajectory ) {
+    //     _yaw_cmd = s_yawf[j];
+    //     _yaw_rate_cmd = d_s_yawf[j];
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    //     j++;
+    //     _trajectory_execution = true;
+    // }
+    // _trajectory_execution = false;
+    _stop_trajectory = false;
 }
