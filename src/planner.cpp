@@ -2,13 +2,13 @@
 
 QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
 
-    this->declare_parameter<float>("cruise_velocity", 1.0f);
+    this->declare_parameter<float>("cruise_velocity", 2.0f);
     _cv = this->get_parameter("cruise_velocity").as_double();
     this->declare_parameter<float>( "cruise_velocity_takeoff", 1.0f);
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
     this->declare_parameter<float>( "takeoff_altitude", 1.5f);
     _to_altitude = this->get_parameter("takeoff_altitude").as_double();
-    this->declare_parameter<float>( "cruise_velocity_rotation", 1.0f );
+    this->declare_parameter<float>( "cruise_velocity_rotation", 0.5f );
     _cv_rot = this->get_parameter("cruise_velocity_rotation").as_double();
 
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
@@ -201,10 +201,6 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
     if( _first_odom && _first_traj ) {
 
         px4_msgs::msg::TrajectorySetpoint msg{};
-        rclcpp::Time now = this->get_clock()->now();
-    
-        msg.timestamp = now.nanoseconds() / 1000.0;
-    
         msg.position[0] = _pos_cmd(0);
         msg.position[1] = _pos_cmd(1);
         msg.position[2] = _pos_cmd(2);
@@ -222,7 +218,8 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
         // msg.yawspeed = 0.0f;
         msg.yaw = _yaw_cmd;
         msg.yawspeed = _yaw_rate_cmd;
-    
+        // rclcpp::Time now = this->get_clock()->now();
+        msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
         _trajectory_setpoint_pub->publish(msg);
 
     }
@@ -232,15 +229,13 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
 void QUINTIC_PLANNER::publish_offboard_control_mode() {
     
     px4_msgs::msg::OffboardControlMode msg{};
-    rclcpp::Time now = this->get_clock()->now();
-    msg.timestamp = now.nanoseconds() / 1000.0;
-
     msg.position = true;
     msg.velocity = true;
     msg.acceleration = true;
     msg.attitude = false;
     msg.body_rate = false;
-
+    // rclcpp::Time now = this->get_clock()->now();
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
     _offboard_control_mode_pub->publish(msg);
     // std::cout<<"Pubblico offboard_control_mode\n";
 }
@@ -248,9 +243,6 @@ void QUINTIC_PLANNER::publish_offboard_control_mode() {
 void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1, float param2 ) {
     
     px4_msgs::msg::VehicleCommand msg{};
-    rclcpp::Time now = this->get_clock()->now();
-
-    msg.timestamp = now.nanoseconds() / 1000.0;
 
     msg.param1 = param1;
     msg.param2 = param2;
@@ -261,8 +253,9 @@ void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1,
 	msg.source_system = 1;
 	msg.source_component = 1;
 	msg.from_external = true;
-	
 	std::cout << "Sending command\n";
+    // rclcpp::Time now = this->get_clock()->now();
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
     _vehicle_command_pub->publish(msg);
 }
 
