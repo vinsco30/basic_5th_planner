@@ -150,12 +150,14 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
 
     //Control to avoid high yaw changes
     if ( yaw_first >= -M_PI && yaw_first <= -M_PI_2 ) {
+        std::cout<<"\n Next yaw between -pi and -pi/2: "<<yaw_first<<endl;
         if (start_yaw >= M_PI_2 && start_yaw <= M_PI ) {
             yaw_first += 2*M_PI; 
             cout<<"\n First case Heading angle now: "<<yaw_first<<endl;
         }
     }
     if ( yaw_first >= M_PI_2 && yaw_first <= M_PI ) {
+        std::cout<<"\n Next yaw between pi/2 and pi: "<<yaw_first<<endl;
         if ( start_yaw >= -M_PI && start_yaw <= -M_PI_2 ) {
             yaw_first -= 2*M_PI;
             cout<<"\n Second case, Heading angle: "<<yaw_first<<endl;

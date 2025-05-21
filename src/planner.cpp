@@ -2,7 +2,7 @@
 
 QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
 
-    this->declare_parameter<float>("cruise_velocity", 2.0f);
+    this->declare_parameter<float>("cruise_velocity", 0.8f);
     _cv = this->get_parameter("cruise_velocity").as_double();
     this->declare_parameter<float>( "cruise_velocity_takeoff", 1.0f);
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
@@ -55,6 +55,8 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     // _timer_client =
     //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::client_loop, this));
     boost::thread client_loop_t( &QUINTIC_PLANNER::client_loop, this );
+    boost::thread setpoint_publisher_t( &QUINTIC_PLANNER::publish_trajectory_setpoint, this );
+    // boost::thread offboard_publisher_t( &QUINTIC_PLANNER::publish_offboard_control_mode, this );
 }
 
 void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr odom_msg) {
@@ -80,16 +82,16 @@ void QUINTIC_PLANNER::run_loop() {
         _vel_cmd << 0.0f, 0.0f, 0.0f;
         _acc_cmd << 0.0f, 0.0f, 0.0f;
         _yaw_cmd = _yaw_odom;
+        std::cout << "\n First setpoint: x = " << _pos_cmd(0) << ", y = " << _pos_cmd(1) << ", z = " << _pos_cmd(2) << ", yaw= "<<_yaw_cmd<<"\n";
         _first_traj = true;
-        
         return;
     }
     if (_offboard_setpoint_counter == 10) {
 		this->vehicle_command_publisher(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
 
-    publish_offboard_control_mode();
-    publish_trajectory_setpoint();
+    // publish_offboard_control_mode();
+    // publish_trajectory_setpoint();
 
     if (_offboard_setpoint_counter < 11) {
 		_offboard_setpoint_counter++;
@@ -198,47 +200,64 @@ void QUINTIC_PLANNER::client_loop() {
 
 void QUINTIC_PLANNER::publish_trajectory_setpoint() {
 
-    if( _first_odom && _first_traj ) {
+    while( rclcpp::ok() ) {
+        if( _first_odom && _first_traj ) {
 
-        px4_msgs::msg::TrajectorySetpoint msg{};
-        msg.position[0] = _pos_cmd(0);
-        msg.position[1] = _pos_cmd(1);
-        msg.position[2] = _pos_cmd(2);
+            px4_msgs::msg::TrajectorySetpoint msg{};
+            msg.position[0] = _pos_cmd(0);
+            msg.position[1] = _pos_cmd(1);
+            msg.position[2] = _pos_cmd(2);
+        
+            msg.velocity[0] = _vel_cmd(0);
+            msg.velocity[1] = _vel_cmd(1);
+            msg.velocity[2] = _vel_cmd(2);
+        
+            msg.acceleration[0] = _acc_cmd(0);
+            msg.acceleration[1] = _acc_cmd(1);
+            msg.acceleration[2] = _acc_cmd(2);
+        
+            matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
+            // msg.yaw = matrix::Eulerf( des_att ).psi();
+            // msg.yawspeed = 0.0f;
+            msg.yaw = _yaw_cmd;
+            msg.yawspeed = _yaw_rate_cmd;
+            msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
+            _trajectory_setpoint_pub->publish(msg);
     
-        msg.velocity[0] = _vel_cmd(0);
-        msg.velocity[1] = _vel_cmd(1);
-        msg.velocity[2] = _vel_cmd(2);
-    
-        msg.acceleration[0] = _acc_cmd(0);
-        msg.acceleration[1] = _acc_cmd(1);
-        msg.acceleration[2] = _acc_cmd(2);
-    
-        matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
-        // msg.yaw = matrix::Eulerf( des_att ).psi();
-        // msg.yawspeed = 0.0f;
-        msg.yaw = _yaw_cmd;
-        msg.yawspeed = _yaw_rate_cmd;
-        // rclcpp::Time now = this->get_clock()->now();
+        }
+        px4_msgs::msg::OffboardControlMode msg{};
+        msg.position = true;
+        msg.velocity = true;
+        msg.acceleration = true;
+        msg.attitude = false;
+        msg.body_rate = false;
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
-        _trajectory_setpoint_pub->publish(msg);
+        _offboard_control_mode_pub->publish(msg);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     }
 
 }
 
-void QUINTIC_PLANNER::publish_offboard_control_mode() {
+// void QUINTIC_PLANNER::publish_offboard_control_mode() {
     
-    px4_msgs::msg::OffboardControlMode msg{};
-    msg.position = true;
-    msg.velocity = true;
-    msg.acceleration = true;
-    msg.attitude = false;
-    msg.body_rate = false;
-    // rclcpp::Time now = this->get_clock()->now();
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
-    _offboard_control_mode_pub->publish(msg);
-    // std::cout<<"Pubblico offboard_control_mode\n";
-}
+//     while( rclcpp::ok() ) {
+
+//         px4_msgs::msg::OffboardControlMode msg{};
+//         msg.position = true;
+//         msg.velocity = true;
+//         msg.acceleration = true;
+//         msg.attitude = false;
+//         msg.body_rate = false;
+//         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
+//         _offboard_control_mode_pub->publish(msg);
+//         std::cout<<"Pubblico offboard_control_mode\n";
+//         std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//     }
+
+    
+// }
 
 void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1, float param2 ) {
     
@@ -254,7 +273,6 @@ void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1,
 	msg.source_component = 1;
 	msg.from_external = true;
 	std::cout << "Sending command\n";
-    // rclcpp::Time now = this->get_clock()->now();
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
     _vehicle_command_pub->publish(msg);
 }
