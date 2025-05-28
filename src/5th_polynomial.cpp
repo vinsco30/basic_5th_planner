@@ -131,9 +131,9 @@ void QUINTIC_PLANNER::generateTakeOffTraj( const Eigen::Vector3d& start_pos, con
         _acc_cmd(1) = dd_yd[j];
         _acc_cmd(2) = dd_zd[j];
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         j++;
         _trajectory_execution = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
     _stop_trajectory = false;  
@@ -184,9 +184,9 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
     while( j<s_yaw.size() && !_stop_trajectory ) {
         _yaw_cmd = s_yaw[j];
         _yaw_rate_cmd = d_s_yaw[j];
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         j++;
         _trajectory_execution = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
 
@@ -237,9 +237,10 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
         _acc_cmd(1) = dd_yd[j];
         _acc_cmd(2) = dd_zd[j];
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
         j++;
         _trajectory_execution = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
 

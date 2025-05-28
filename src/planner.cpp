@@ -2,7 +2,7 @@
 
 QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
 
-    this->declare_parameter<float>("cruise_velocity", 0.8f);
+    this->declare_parameter<float>("cruise_velocity", 3.0f);
     _cv = this->get_parameter("cruise_velocity").as_double();
     this->declare_parameter<float>( "cruise_velocity_takeoff", 1.0f);
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
@@ -55,7 +55,7 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     // _timer_client =
     //     this->create_wall_timer(100ms, std::bind(&QUINTIC_PLANNER::client_loop, this));
     boost::thread client_loop_t( &QUINTIC_PLANNER::client_loop, this );
-    boost::thread setpoint_publisher_t( &QUINTIC_PLANNER::publish_trajectory_setpoint, this );
+    // boost::thread setpoint_publisher_t( &QUINTIC_PLANNER::publish_trajectory_setpoint, this );
     // boost::thread offboard_publisher_t( &QUINTIC_PLANNER::publish_offboard_control_mode, this );
 }
 
@@ -90,8 +90,8 @@ void QUINTIC_PLANNER::run_loop() {
 		this->vehicle_command_publisher(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
 
-    // publish_offboard_control_mode();
-    // publish_trajectory_setpoint();
+    publish_offboard_control_mode();
+    publish_trajectory_setpoint();
 
     if (_offboard_setpoint_counter < 11) {
 		_offboard_setpoint_counter++;
@@ -144,15 +144,12 @@ void QUINTIC_PLANNER::goto_exec() {
 
         pos_init = _pos_odom;
         quat_init = _quat_odom;
-        std::cout<<"step1\n";
         pos_end << _pos_key(0), _pos_key(1), _pos_key(2);
 
         if( pos_end(2) > 0.0 ) {
-            std::cout << "Z coordinate is positive, setting it to negative\n";
             pos_end(2) = -pos_end(2);
         }
 
-        std::cout<<"step2\n";
         generateGoToTraj( pos_init, _yaw_odom, pos_end, _yaw_key, _cv );
         std::cout << "Goto trajectory set\n";
     // }
@@ -194,13 +191,14 @@ void QUINTIC_PLANNER::client_loop() {
         else {
             std::cout << "Unknown command;\n";
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     } 
 
 }
 
 void QUINTIC_PLANNER::publish_trajectory_setpoint() {
 
-    while( rclcpp::ok() ) {
+    // while( rclcpp::ok() ) {
         if( _first_odom && _first_traj ) {
 
             px4_msgs::msg::TrajectorySetpoint msg{};
@@ -212,9 +210,13 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
             msg.velocity[1] = _vel_cmd(1);
             msg.velocity[2] = _vel_cmd(2);
         
-            msg.acceleration[0] = _acc_cmd(0);
-            msg.acceleration[1] = _acc_cmd(1);
-            msg.acceleration[2] = _acc_cmd(2);
+            // msg.acceleration[0] = _acc_cmd(0);
+            // msg.acceleration[1] = _acc_cmd(1);
+            // msg.acceleration[2] = _acc_cmd(2);
+        
+            msg.acceleration[0] = NAN;
+            msg.acceleration[1] = NAN;
+            msg.acceleration[2] = NAN;
         
             matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
             // msg.yaw = matrix::Eulerf( des_att ).psi();
@@ -224,40 +226,40 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
             msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
             _trajectory_setpoint_pub->publish(msg);
     
-        }
-        px4_msgs::msg::OffboardControlMode msg{};
-        msg.position = true;
-        msg.velocity = true;
-        msg.acceleration = true;
-        msg.attitude = false;
-        msg.body_rate = false;
-        msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
-        _offboard_control_mode_pub->publish(msg);
+        // }
+        // px4_msgs::msg::OffboardControlMode msg{};
+        // msg.position = true;
+        // msg.velocity = true;
+        // msg.acceleration = true;
+        // msg.attitude = false;
+        // msg.body_rate = false;
+        // msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
+        // _offboard_control_mode_pub->publish(msg);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     }
 
 }
 
-// void QUINTIC_PLANNER::publish_offboard_control_mode() {
+void QUINTIC_PLANNER::publish_offboard_control_mode() {
     
-//     while( rclcpp::ok() ) {
+    // while( rclcpp::ok() ) {
 
-//         px4_msgs::msg::OffboardControlMode msg{};
-//         msg.position = true;
-//         msg.velocity = true;
-//         msg.acceleration = true;
-//         msg.attitude = false;
-//         msg.body_rate = false;
-//         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
-//         _offboard_control_mode_pub->publish(msg);
-//         std::cout<<"Pubblico offboard_control_mode\n";
-//         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-//     }
+        px4_msgs::msg::OffboardControlMode msg{};
+        msg.position = true;
+        msg.velocity = true;
+        msg.acceleration = false;
+        msg.attitude = false;
+        msg.body_rate = false;
+        msg.timestamp = this->get_clock()->now().nanoseconds() / 1000.0;
+        _offboard_control_mode_pub->publish(msg);
+        // std::cout<<"Pubblico offboard_control_mode\n";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
 
     
-// }
+}
 
 void QUINTIC_PLANNER::vehicle_command_publisher( uint16_t command, float param1, float param2 ) {
     
