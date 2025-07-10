@@ -2,7 +2,7 @@
 
 QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
 
-    this->declare_parameter<float>("cruise_velocity", 3.0f);
+    this->declare_parameter<float>("cruise_velocity", 1.0f);
     _cv = this->get_parameter("cruise_velocity").as_double();
     this->declare_parameter<float>( "cruise_velocity_takeoff", 1.0f);
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
@@ -159,11 +159,36 @@ void QUINTIC_PLANNER::goto_exec() {
 
 }
 
+void QUINTIC_PLANNER::loiting_exec() {
+
+    // if( _takeoff_completed ) {
+
+        Eigen::Vector3d pos_init;
+        Eigen::Vector4d quat_init;
+        Eigen::Vector3d pos_end;
+        Eigen::Vector4d quat_end;
+
+        pos_init = _pos_odom;
+        quat_init = _quat_odom;
+        pos_end << _pos_key(0), _pos_key(1), _pos_key(2);
+
+        if( pos_end(2) > 0.0 ) {
+            pos_end(2) = -pos_end(2);
+        }
+
+        generateCircleTraj( pos_init, _yaw_odom, pos_end, _yaw_key, _cv );
+        std::cout << "Circle trajectory set\n";
+    // }
+    // else {
+    //     std::cout << "Takeoff not completed yet\n";
+    // }
+
+}
 void QUINTIC_PLANNER::client_loop() {
     bool exit = false;
     std::cout << "Starting client loop...\n";
     while( !exit && rclcpp::ok() ) {
-        std::cout << "Enter command [arm | go | takeoff | stop]: \n"; 
+        std::cout << "Enter command [arm | go | takeoff | circle | stop]: \n"; 
         std::cin >> _cmd;
         if( _cmd == "arm" ) {
             this->arm();
@@ -187,6 +212,17 @@ void QUINTIC_PLANNER::client_loop() {
         else if( _cmd == "stop" ) {
             exit = true;
             rclcpp::shutdown();
+        }
+        else if( _cmd == "circle" ) {
+            std::cout << "Enter X coordinate of the center: "; 
+            std::cin >> _pos_key(0);
+            std::cout << "Enter Y coordinate of the center: "; 
+            std::cin >> _pos_key(1);
+            std::cout << "Enter Z coordinate of the center: "; 
+            std::cin >> _pos_key(2);
+            std::cout << "Enter final yaw: "; 
+            std::cin >> _yaw_key;
+            loiting_exec();
         }
         else {
             std::cout << "Unknown command;\n";

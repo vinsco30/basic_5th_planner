@@ -40,6 +40,7 @@ private:
     void takeoff_exec( float altitude );
     void land_exec();
     void goto_exec();
+    void loiting_exec();
     void vehicle_command_publisher( uint16_t command, float param1 = 0.0f, float param2 = 0.0f );
     void publish_trajectory_setpoint();
     void publish_offboard_control_mode();
@@ -47,6 +48,7 @@ private:
     /*Trajectory generation functions*/
     void generateTakeOffTraj( const Eigen::Vector3d& start_pos, const Eigen::Vector3d& final_pos, const float cv );
     void generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
+    void generateCircleTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
 
     //Subscriptions
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
