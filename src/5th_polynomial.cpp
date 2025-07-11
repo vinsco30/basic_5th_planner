@@ -81,6 +81,82 @@ void computeQuinticTraj(Eigen::MatrixXd A, double t0, double tf, int n, std::vec
     }    
 }
 
+void QUINTIC_PLANNER::generateGoToTEST( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv ) {
+    //X-Y-Z trajectory
+    std::vector<double> vec_s0{start_pos(0), start_pos(1), start_pos(2)};
+    std::vector<double> vec_sf{final_pos(0), final_pos(1), final_pos(2)};
+
+    float tf = ( final_pos(0)-start_pos(0) ) / cv;
+    std::cout<<"\n Time to reach the target point: "<<tf<<" s\n";
+    double dt = 0.01;
+    double t0 = 0.0;
+    float n_points = tf * 1/dt;
+    int np = ceil( n_points );
+
+    Eigen::MatrixXd traj_A = computeQuinticCoeff( t0, tf,  vec_s0, vec_sf );
+    std::vector<double> s, d_s, dd_s, time_s;
+
+    computeQuinticTraj( traj_A, t0, tf, np, s, d_s, dd_s, time_s );
+    // std::vector<double> xd, yd, zd, d_xd, d_yd, d_zd, dd_xd, dd_yd, dd_zd;
+
+    // for( int i=0; i<s.size(); i++ ) {
+    //     xd.push_back(start_pos(0) + (s[i]/( final_pos-start_pos ).norm())*
+    //         ( final_pos(0)-start_pos(0) ));
+    //     yd.push_back(start_pos(1) + (s[i]/( final_pos-start_pos ).norm())*
+    //         ( final_pos(1)-start_pos(1) ));
+    //     zd.push_back(start_pos(2) + (s[i]/( final_pos-start_pos ).norm())*
+    //         ( final_pos(2)-start_pos(2) ));
+    //     d_xd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(0)-start_pos(0) ));
+    //     d_yd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(1)-start_pos(1) ));
+    //     d_zd.push_back(d_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(2)-start_pos(2) ));
+    //     dd_xd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(0)-start_pos(0) ));
+    //     dd_yd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(1)-start_pos(1) ));
+    //     dd_zd.push_back(dd_s[i]/( final_pos-start_pos ).norm()*
+    //         ( final_pos(2)-start_pos(2) ));
+    // }
+    int j = 0;
+    _trajectory_execution = false;
+    // while( j<xd.size() && !_stop_trajectory ) {
+    //     _pos_cmd(0) = xd[j];
+    //     _pos_cmd(1) = yd[j];
+    //     _pos_cmd(2) = zd[j];
+    //     _vel_cmd(0) = d_xd[j];
+    //     _vel_cmd(1) = d_yd[j];
+    //     _vel_cmd(2) = d_zd[j];
+    //     _acc_cmd(0) = dd_xd[j];
+    //     _acc_cmd(1) = dd_yd[j];
+    //     _acc_cmd(2) = dd_zd[j];
+
+    //     // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    //     j++;
+    //     _trajectory_execution = true;
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // }
+
+    while( j<s.size() && !_stop_trajectory ) {
+        _pos_cmd(0) = s[j];
+        // _pos_cmd(1) = yd[j];
+        // _pos_cmd(2) = zd[j];
+        _vel_cmd(0) = d_s[j];
+        // _vel_cmd(1) = d_yd[j];
+        // _vel_cmd(2) = d_zd[j];
+        _acc_cmd(0) = dd_s[j];
+        // _acc_cmd(1) = dd_yd[j];
+        // _acc_cmd(2) = dd_zd[j];
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        j++;
+        _trajectory_execution = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    _trajectory_execution = false;
+}
+
 void QUINTIC_PLANNER::generateTakeOffTraj( const Eigen::Vector3d& start_pos, const Eigen::Vector3d& final_pos, const float cv ) {
 
     std::vector<double> vec_s0{0.0, 0.0, 0.0};
@@ -195,6 +271,8 @@ void QUINTIC_PLANNER::generateGoToTraj( const Eigen::Vector3d& start_pos, const 
     std::vector<double> vec_sf{( final_pos-start_pos ).norm(), 0.0, 0.0};
 
     tf = ( final_pos-start_pos ).norm() / cv;
+    std::cout<<"\n Time to reach the target point: "<<tf<<" s\n";
+    std::cout<<"\n Target cruise velocity: "<<cv<<" m/s\n";
     n_points = tf * 1/dt;
     np = ceil( n_points );
 
@@ -341,6 +419,7 @@ void QUINTIC_PLANNER::generateCircleTraj(const Eigen::Vector3d& start_pos, const
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
+    std::cout<<"\n -------First Yaw executed--------\n";
 
     //Go to the center of the circle
     std::vector<double> vec_s0{0.0, 0.0, 0.0};
@@ -395,13 +474,14 @@ void QUINTIC_PLANNER::generateCircleTraj(const Eigen::Vector3d& start_pos, const
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
+    std::cout<<"\n -------Go to the center of the circle executed--------\n";
 
     //Go to the circumpherence
 
     //Yaw heading to the target point on the circumpherence trajectory
     Eigen::Vector3d new_pos;
     new_pos << final_pos(0) +1, final_pos(1), final_pos(2);
-    heading = new_pos.head(2) - start_pos.head(2);
+    heading = new_pos.head(2) - final_pos.head(2);
     heading /= heading.norm();
     double yaw_second = atan2(heading(1), heading(0));
     std::cout<<"\n Yaw towards the target point: "<<yaw_second<<" rad\n";
@@ -444,58 +524,59 @@ void QUINTIC_PLANNER::generateCircleTraj(const Eigen::Vector3d& start_pos, const
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     _trajectory_execution = false;
+    std::cout<<"\n -------Second Yaw executed--------\n";
 
-    //Go ton the circumpherence
-    std::vector<double> vec_s1{0.0, 0.0, 0.0};
-    std::vector<double> vec_s2{( new_pos - final_pos ).norm(), 0.0, 0.0};
+    // //Go on the circumpherence
+    // std::vector<double> vec_s1{0.0, 0.0, 0.0};
+    // std::vector<double> vec_s2{( new_pos - final_pos ).norm(), 0.0, 0.0};
 
-    tf = ( new_pos - final_pos ).norm() / cv;
-    n_points = tf * 1/dt;
-    np = ceil( n_points );
+    // tf = ( new_pos - final_pos ).norm() / cv;
+    // n_points = tf * 1/dt;
+    // np = ceil( n_points );
 
-    Eigen::MatrixXd traj_A1 = computeQuinticCoeff( t0, tf,  vec_s1, vec_s2 );
+    // Eigen::MatrixXd traj_A1 = computeQuinticCoeff( t0, tf,  vec_s1, vec_s2 );
 
-    computeQuinticTraj( traj_A1, t0, tf, np, s, d_s, dd_s, time_s );
+    // computeQuinticTraj( traj_A1, t0, tf, np, s, d_s, dd_s, time_s );
 
-    for( int i=0; i<s.size(); i++ ) {
-        xd.push_back(BOOST_FUNCTIONAL_HASH_DETAIL_HASH_FLOAT_HEADER(0) + (s[i]/( new_pos-final_pos ).norm())*
-            ( new_pos(0)-final_pos(0) ));
-        yd.push_back(final_pos(1) + (s[i]/( new_pos-final_pos ).norm())*
-            ( new_pos(1)-final_pos(1) ));
-        zd.push_back(final_pos(2) + (s[i]/( new_pos-final_pos ).norm())*
-            ( new_pos(2)-final_pos(2) ));
-        d_xd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(0)-final_pos(0) ));
-        d_yd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(1)-final_pos(1) ));
-        d_zd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(2)-final_pos(2) ));
-        dd_xd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(0)-final_pos(0) ));
-        dd_yd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(1)-final_pos(1) ));
-        dd_zd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
-            ( new_pos(2)-final_pos(2) ));
-    }
-    j = 0;
-    _trajectory_execution = false;
-    while( j<xd.size() && !_stop_trajectory ) {
-        _pos_cmd(0) = xd[j];
-        _pos_cmd(1) = yd[j];
-        _pos_cmd(2) = zd[j];
-        _vel_cmd(0) = d_xd[j];
-        _vel_cmd(1) = d_yd[j];
-        _vel_cmd(2) = d_zd[j];
-        _acc_cmd(0) = dd_xd[j];
-        _acc_cmd(1) = dd_yd[j];
-        _acc_cmd(2) = dd_zd[j];
+    // for( int i=0; i<s.size(); i++ ) {
+    //     xd.push_back(BOOST_FUNCTIONAL_HASH_DETAIL_HASH_FLOAT_HEADER(0) + (s[i]/( new_pos-final_pos ).norm())*
+    //         ( new_pos(0)-final_pos(0) ));
+    //     yd.push_back(final_pos(1) + (s[i]/( new_pos-final_pos ).norm())*
+    //         ( new_pos(1)-final_pos(1) ));
+    //     zd.push_back(final_pos(2) + (s[i]/( new_pos-final_pos ).norm())*
+    //         ( new_pos(2)-final_pos(2) ));
+    //     d_xd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(0)-final_pos(0) ));
+    //     d_yd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(1)-final_pos(1) ));
+    //     d_zd.push_back(d_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(2)-final_pos(2) ));
+    //     dd_xd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(0)-final_pos(0) ));
+    //     dd_yd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(1)-final_pos(1) ));
+    //     dd_zd.push_back(dd_s[i]/( new_pos-final_pos ).norm()*
+    //         ( new_pos(2)-final_pos(2) ));
+    // }
+    // j = 0;
+    // _trajectory_execution = false;
+    // while( j<xd.size() && !_stop_trajectory ) {
+    //     _pos_cmd(0) = xd[j];
+    //     _pos_cmd(1) = yd[j];
+    //     _pos_cmd(2) = zd[j];
+    //     _vel_cmd(0) = d_xd[j];
+    //     _vel_cmd(1) = d_yd[j];
+    //     _vel_cmd(2) = d_zd[j];
+    //     _acc_cmd(0) = dd_xd[j];
+    //     _acc_cmd(1) = dd_yd[j];
+    //     _acc_cmd(2) = dd_zd[j];
 
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        j++;
-        _trajectory_execution = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    _trajectory_execution = false;
+    //     // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    //     j++;
+    //     _trajectory_execution = true;
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // }
+    // _trajectory_execution = false;
 
     /*----------Circular Trajectory--------------*/
 

@@ -8,7 +8,7 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
     this->declare_parameter<float>( "takeoff_altitude", 1.5f);
     _to_altitude = this->get_parameter("takeoff_altitude").as_double();
-    this->declare_parameter<float>( "cruise_velocity_rotation", 0.5f );
+    this->declare_parameter<float>( "cruise_velocity_rotation", 0.8f );
     _cv_rot = this->get_parameter("cruise_velocity_rotation").as_double();
 
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
@@ -188,7 +188,7 @@ void QUINTIC_PLANNER::client_loop() {
     bool exit = false;
     std::cout << "Starting client loop...\n";
     while( !exit && rclcpp::ok() ) {
-        std::cout << "Enter command [arm | go | takeoff | circle | stop]: \n"; 
+        std::cout << "Enter command [arm | go | takeoff | circle | test | stop]: \n"; 
         std::cin >> _cmd;
         if( _cmd == "arm" ) {
             this->arm();
@@ -224,6 +224,34 @@ void QUINTIC_PLANNER::client_loop() {
             std::cin >> _yaw_key;
             loiting_exec();
         }
+        else if( _cmd == "test" ) {
+            std::cout << "Testing trajectory generation...\n";
+            // std::cout << "Enter X coordinate of the center: "; 
+            // std::cin >> _pos_key(0);
+            // std::cout << "Enter Y coordinate of the center: "; 
+            // std::cin >> _pos_key(1);
+            // std::cout << "Enter Z coordinate of the center: "; 
+            // std::cin >> _pos_key(2);
+            // std::cout << "Enter final yaw: "; 
+            // std::cin >> _yaw_key;
+            Eigen::Vector3d q_init, q_final;
+            std::cout << "Enter q init value: "; 
+            std::cin >> q_init(0);
+            std::cout << "Enter q_dot init value: "; 
+            std::cin >> q_init(1);
+            std::cout << "Enter q_ddot init value: "; 
+            std::cin >> q_init(2);
+
+            std::cout << "Enter q final value: "; 
+            std::cin >> q_final(0);
+            std::cout << "Enter q_dot final value: "; 
+            std::cin >> q_final(1);
+            std::cout << "Enter q_ddot final value: "; 
+            std::cin >> q_final(2);
+
+
+            generateGoToTEST( q_init, 0.0f, q_final, 0.0f, _cv );
+        }
         else {
             std::cout << "Unknown command;\n";
         }
@@ -246,13 +274,13 @@ void QUINTIC_PLANNER::publish_trajectory_setpoint() {
             msg.velocity[1] = _vel_cmd(1);
             msg.velocity[2] = _vel_cmd(2);
         
-            // msg.acceleration[0] = _acc_cmd(0);
-            // msg.acceleration[1] = _acc_cmd(1);
-            // msg.acceleration[2] = _acc_cmd(2);
+            msg.acceleration[0] = _acc_cmd(0);
+            msg.acceleration[1] = _acc_cmd(1);
+            msg.acceleration[2] = _acc_cmd(2);
         
-            msg.acceleration[0] = NAN;
-            msg.acceleration[1] = NAN;
-            msg.acceleration[2] = NAN;
+            // msg.acceleration[0] = NAN;
+            // msg.acceleration[1] = NAN;
+            // msg.acceleration[2] = NAN;
         
             matrix::Quaternionf des_att(_quat_cmd(0), _quat_cmd(1), _quat_cmd(2), _quat_cmd(3));
             // msg.yaw = matrix::Eulerf( des_att ).psi();
