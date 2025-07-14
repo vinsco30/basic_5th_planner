@@ -8,11 +8,12 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     _cv_to = this->get_parameter("cruise_velocity_takeoff").as_double();
     this->declare_parameter<float>( "takeoff_altitude", 1.5f);
     _to_altitude = this->get_parameter("takeoff_altitude").as_double();
-    this->declare_parameter<float>( "cruise_velocity_rotation", 0.8f );
+    this->declare_parameter<float>( "cruise_velocity_rotation", 0.5f );
     _cv_rot = this->get_parameter("cruise_velocity_rotation").as_double();
 
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
     auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+    _counter = 0;
 
     //Inputs
     _odom_sub = 
@@ -82,6 +83,7 @@ void QUINTIC_PLANNER::run_loop() {
         _vel_cmd << 0.0f, 0.0f, 0.0f;
         _acc_cmd << 0.0f, 0.0f, 0.0f;
         _yaw_cmd = _yaw_odom;
+        _last_yaw = _yaw_odom;
         std::cout << "\n First setpoint: x = " << _pos_cmd(0) << ", y = " << _pos_cmd(1) << ", z = " << _pos_cmd(2) << ", yaw= "<<_yaw_cmd<<"\n";
         _first_traj = true;
         return;
@@ -89,6 +91,8 @@ void QUINTIC_PLANNER::run_loop() {
     if (_offboard_setpoint_counter == 10) {
 		this->vehicle_command_publisher(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 	}
+
+    getNext();
 
     publish_offboard_control_mode();
     publish_trajectory_setpoint();

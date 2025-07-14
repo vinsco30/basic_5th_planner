@@ -50,6 +50,7 @@ private:
     void generateGoToTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
     void generateCircleTraj( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
     void generateGoToTEST( const Eigen::Vector3d& start_pos, const float& start_yaw, const Eigen::Vector3d& final_pos, const float& final_yaw, const float cv );
+    bool getNext();
     
     //Subscriptions
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr _odom_sub;
@@ -85,9 +86,19 @@ private:
     float _yaw_rate_cmd{0.0f};
 
     int _offboard_setpoint_counter{0};
+    int _counter;
     std::string _cmd;
     Eigen::Vector3d _pos_key;
     float _yaw_key{0.0f};
+
+    /*Trajectoryes completed*/
+    std::vector<double> _xd, _yd, _zd, _d_xd, _d_yd, _d_zd, _dd_xd, _dd_yd, _dd_zd;
+    std::vector<double> _s_yaw, _d_s_yaw, _dd_s_yaw, _time_s_yaw;
+    Eigen::Vector3d _last_pos;
+    Eigen::Vector3d _last_vel;
+    Eigen::Vector3d _last_acc;
+    Eigen::Vector4d _last_quat;
+    double _last_yaw{0.0};
 
 
     //Flags
@@ -96,6 +107,8 @@ private:
     bool _trajectory_execution{false};
     bool _stop_trajectory{false};
     bool _takeoff_completed{false};
+    bool _trajectory_ready{false};
+    bool _yaw_trajectory_ready{false};
 
     //Parameters
     float _cv{0.0f}; ///< cruise velocity
