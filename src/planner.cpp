@@ -58,6 +58,12 @@ QUINTIC_PLANNER::QUINTIC_PLANNER() : Node("quintic_planner") {
     boost::thread client_loop_t( &QUINTIC_PLANNER::client_loop, this );
     // boost::thread setpoint_publisher_t( &QUINTIC_PLANNER::publish_trajectory_setpoint, this );
     // boost::thread offboard_publisher_t( &QUINTIC_PLANNER::publish_offboard_control_mode, this );
+
+    // _pp = new PATH_PLANNER();
+    double xbounds[2] = {0.0, 20.0};
+    double ybounds[2] = {0.0, 10.0};
+    double zbounds[2] = {0.0, 2.0};
+    // _pp->init_planner(1000, xbounds, ybounds, zbounds);
 }
 
 void QUINTIC_PLANNER::odom_cb(const px4_msgs::msg::VehicleOdometry::SharedPtr odom_msg) {
@@ -358,6 +364,7 @@ int main(int argc, char* argv[]) {
 	rclcpp::init(argc, argv);
 
     rclcpp::spin( std::make_shared<QUINTIC_PLANNER>() );
+
 
     rclcpp::shutdown();
 

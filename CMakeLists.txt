@@ -22,14 +22,20 @@ find_package(Boost REQUIRED COMPONENTS
 find_package(tf2 REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+# find_package(3dPathPlanner REQUIRED)
+find_package(fcl REQUIRED)
+find_package(octomap REQUIRED)
+find_package(octomath REQUIRED)
 
 include_directories(include)
+# find_library(FCL_STATIC_LIB libfcl.a PATHS /usr/local/lib/)
+# include_directories(/usr/include/3dPathPlanner/)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(quintic_planner src/planner.cpp src/5th_polynomial.cpp)
-ament_target_dependencies(quintic_planner rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 std_msgs nav_msgs)
+add_executable(quintic_planner src/planner.cpp src/5th_polynomial.cpp src/pplanner.cpp)
+ament_target_dependencies(quintic_planner rclcpp px4_msgs geometry_msgs Eigen3 Boost tf2 std_msgs nav_msgs fcl ocotomap octomath)
 target_include_directories(quintic_planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>

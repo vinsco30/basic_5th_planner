@@ -1,3 +1,20 @@
+/*FCL for collision*/
+#include "fcl/shape/geometric_shapes.h"
+#include "fcl/narrowphase/narrowphase.h"
+#include "fcl/collision.h"
+#include "fcl/ccd/motion.h"
+#include "fcl/octree.h"
+#include "fcl/traversal/traversal_node_octree.h"
+#include "fcl/broadphase/broadphase.h"
+#include "fcl/shape/geometric_shape_to_BVH_model.h"
+#include "fcl/math/transform.h"
+
+/*Octomap Libraries*/
+#include <octomap/ColorOcTree.h>
+#include <octomap/octomap.h>
+#include <octomap/OcTree.h>
+#include <octomap/AbstractOcTree.h>
+
 /*TODO: Text description*/
 #include <rclcpp/rclcpp.hpp>
 #include <chrono>
@@ -23,6 +40,10 @@
 #include "../include/matrix/Matrix.hpp"
 #include "../include/matrix/Quaternion.hpp"
 #include "../include/matrix/Euler.hpp"
+
+// #include "3dPathPlanner/pplanner.h"
+#include "pplanner.h"
+
 
 class QUINTIC_PLANNER : public rclcpp::Node
 {
@@ -122,4 +143,7 @@ private:
     rclcpp::TimerBase::SharedPtr _timer_offboard;
     rclcpp::TimerBase::SharedPtr _timer_client;
 
+    // PATH_PLANNER _pp;
+
 };
+
